@@ -5,8 +5,11 @@ go 1.20
 require (
 	github.com/Masterminds/squirrel v1.5.3 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
+	github.com/garyburd/redigo v1.6.4 // indirect
 	github.com/georgysavva/scany v1.2.1 // indirect
+	github.com/go-redis/redis v6.15.9+incompatible // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgconn v1.14.0 // indirect
