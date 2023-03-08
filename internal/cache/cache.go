@@ -28,19 +28,23 @@ func NewCache(cleanupInterval, defaultExpiration time.Duration) *Cache {
 	}
 
 	if cleanupInterval > 0 {
-		go cache.GC()
+		go cache.garbageCollector()
 	}
 
 	return cache
 }
 
-func (c *Cache) GC() {
+func (c *Cache) garbageCollector() {
 	for {
 		<-time.After(c.cleanupInterval)
 
-		if c.items == nil {
-			return
+		c.mu.RLock()
+		for key, item := range c.items {
+			if item.Expiration < time.Now().UnixNano() {
+				c.Delete(key)
+			}
 		}
+		c.mu.RUnlock()
 	}
 }
 
@@ -52,9 +56,9 @@ func (c *Cache) Delete(key string) {
 
 func (c *Cache) Load(key string) (entity.Order, error) {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	item, ok := c.items[key]
+	c.mu.RUnlock()
+
 	if !ok {
 		return entity.Order{}, localErrors.ErrCashNotFound
 	}
@@ -63,7 +67,22 @@ func (c *Cache) Load(key string) (entity.Order, error) {
 }
 
 func (c *Cache) Store(value entity.Order) error {
-	exp := time.Now().Add(c.defaultExpiration).Unix()
+	exp := time.Now().Add(c.defaultExpiration).UnixNano()
 	key := value.OrderUID
+	c.mu.Lock()
 
+	c.items[key] = Item{
+		Value:      value,
+		Expiration: exp,
+	}
+
+	c.mu.Unlock()
+	return nil
+}
+
+func (c *Cache) Exist(key string) bool {
+	c.mu.RLock()
+	_, ok := c.items[key]
+	c.mu.RUnlock()
+	return ok
 }

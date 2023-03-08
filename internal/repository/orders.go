@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/Masterminds/squirrel"
 	"github.com/asam-1337/wildberriesL0/internal/domain/entity"
 	"github.com/asam-1337/wildberriesL0/internal/localErrors"
@@ -20,7 +21,7 @@ type orderDto struct {
 	OrderData []byte `db:"order_data"`
 }
 
-func getOrdersDto(order entity.Order) (orderDto, error) {
+func dtoFromOrder(order entity.Order) (orderDto, error) {
 	data, err := json.Marshal(&order)
 	if err != nil {
 		return orderDto{}, err
@@ -31,6 +32,16 @@ func getOrdersDto(order entity.Order) (orderDto, error) {
 	}
 
 	return dto, nil
+}
+
+func orderFromDto(dto orderDto) (entity.Order, error) {
+	order := entity.Order{}
+	err := json.Unmarshal(dto.OrderData, &order)
+	if err != nil {
+		return entity.Order{}, fmt.Errorf("cant unmarshal order json")
+	}
+
+	return order, nil
 }
 
 type OrdersRepository struct {
@@ -48,7 +59,7 @@ func (r *OrdersRepository) GetRunner(ctx context.Context) pgxbalancer.Runner {
 }
 
 func (r *OrdersRepository) Insert(ctx context.Context, order entity.Order) error {
-	dto, err := getOrdersDto(order)
+	dto, err := dtoFromOrder(order)
 	if err != nil {
 		return err
 	}
@@ -85,5 +96,10 @@ func (r *OrdersRepository) SelectById(ctx context.Context, id string) (entity.Or
 		return entity.Order{}, localErrors.ErrNotFound
 	}
 
-	return dto, nil
+	order, err := orderFromDto(dto)
+	if err != nil {
+		return entity.Order{}, err
+	}
+
+	return order, nil
 }
