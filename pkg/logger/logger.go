@@ -1,5 +1,10 @@
 package logger
 
-type Logger interface {
-	Error(err error)
+import (
+	"log"
+	"os"
+)
+
+func Error() {
+	l := log.New(os.Stdout, "[ERROR]")
 }

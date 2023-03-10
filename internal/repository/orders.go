@@ -78,18 +78,17 @@ func (r *OrdersRepository) Insert(ctx context.Context, order entity.Order) error
 }
 
 func (r *OrdersRepository) SelectById(ctx context.Context, id string) (entity.Order, error) {
-	sql, values, err := squirrel.Select("id", "order_data").
+	sql, values, err := squirrel.Select("order_data").
 		From(ordersTable).
 		Where(squirrel.Eq{"id": id}).
 		PlaceholderFormat(squirrel.Dollar).
 		ToSql()
 	if err != nil {
-		return entity.Order{}, nil
+		return entity.Order{}, err
 	}
 
 	runner := r.GetRunner(ctx)
 	row := runner.QueryRow(ctx, sql, values...)
-
 	dto := orderDto{}
 	err = row.Scan(&dto.OrderData)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -102,4 +101,37 @@ func (r *OrdersRepository) SelectById(ctx context.Context, id string) (entity.Or
 	}
 
 	return order, nil
+}
+
+func (r *OrdersRepository) SelectAll(ctx context.Context) ([]entity.Order, error) {
+	sql, values, err := squirrel.Select("order_data").
+		From(ordersTable).
+		ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	runner := r.GetRunner(ctx)
+	rows, err := runner.Query(ctx, sql, values)
+	if err != nil {
+		return nil, err
+	}
+
+	orders := make([]entity.Order, 0)
+	for rows.Next() {
+		dto := orderDto{}
+		err = rows.Scan(&dto.OrderData)
+		if err != nil {
+			return nil, err
+		}
+
+		order, err := orderFromDto(dto)
+		if err != nil {
+			return nil, err
+		}
+
+		orders = append(orders, order)
+	}
+
+	return orders, nil
 }

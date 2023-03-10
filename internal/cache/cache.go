@@ -2,7 +2,6 @@ package cache
 
 import (
 	"github.com/asam-1337/wildberriesL0/internal/domain/entity"
-	"github.com/asam-1337/wildberriesL0/internal/localErrors"
 	"sync"
 	"time"
 )
@@ -54,21 +53,15 @@ func (c *Cache) Delete(key string) {
 	c.mu.Unlock()
 }
 
-func (c *Cache) Load(key string) (entity.Order, error) {
+func (c *Cache) Load(key string) (value entity.Order, loaded bool) {
 	c.mu.RLock()
-	item, ok := c.items[key]
+	item, loaded := c.items[key]
 	c.mu.RUnlock()
-
-	if !ok {
-		return entity.Order{}, localErrors.ErrCashNotFound
-	}
-
-	return item.Value, nil
+	return item.Value, loaded
 }
 
-func (c *Cache) Store(value entity.Order) error {
+func (c *Cache) Store(key string, value entity.Order) {
 	exp := time.Now().Add(c.defaultExpiration).UnixNano()
-	key := value.OrderUID
 	c.mu.Lock()
 
 	c.items[key] = Item{
@@ -77,12 +70,11 @@ func (c *Cache) Store(value entity.Order) error {
 	}
 
 	c.mu.Unlock()
-	return nil
 }
 
-func (c *Cache) Exist(key string) bool {
+func (c *Cache) Exist(key string) (loaded bool) {
 	c.mu.RLock()
-	_, ok := c.items[key]
+	_, loaded = c.items[key]
 	c.mu.RUnlock()
-	return ok
+	return loaded
 }

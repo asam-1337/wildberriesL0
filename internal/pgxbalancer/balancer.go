@@ -35,20 +35,20 @@ type TransactionBalancer struct {
 	dbPool *pgxpool.Pool
 }
 
-func NewTransactionBalancer(ctx context.Context, cfg config.PostgresConfig) (*TransactionBalancer, error) {
+func NewTransactionBalancer(ctx context.Context, cfg config.PostgresConfig) (TransactionBalancer, error) {
 	dsn := fmt.Sprintf("user=%s dbname=%s  password=%s host=%s port=%s pool_max_conns=%d pool_min_conns=%d pool_max_conn_lifetime=%s pool_max_conn_idle_time=%s pool_health_check_period=%s",
 		cfg.Username, cfg.DbName, cfg.Password, cfg.Host, cfg.Port, poolMaxConns, poolMinConns, poolMaxConnLifetime, poolMaxConnIdleTime, poolHealthCheckPeriod)
 
 	c, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
-		return nil, fmt.Errorf("cant parse pool config")
+		return TransactionBalancer{}, fmt.Errorf("cant parse pool config")
 	}
 
 	pool, err := pgxpool.NewWithConfig(ctx, c)
 	if err != nil {
-		return nil, fmt.Errorf("can")
+		return TransactionBalancer{}, fmt.Errorf("can")
 	}
-	return &TransactionBalancer{dbPool: pool}, nil
+	return TransactionBalancer{dbPool: pool}, nil
 }
 
 func (t *TransactionBalancer) GetRunner(ctx context.Context) Runner {

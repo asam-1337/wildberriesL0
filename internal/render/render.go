@@ -22,14 +22,12 @@ func NewRenderService() *Render {
 	return r
 }
 
-func (r *Render) RenderRootPage(w io.Writer, orders []entity.Order) error {
+func (r *Render) RenderRootPage(w io.Writer, orders entity.Order, exist bool) error {
 	return r.tmpl.ExecuteTemplate(w, "index.html", struct {
-		Orders []entity.Order
+		Order entity.Order
+		Exist bool
 	}{
-		Orders: orders,
+		Order: orders,
+		Exist: exist,
 	})
-}
-
-func (r *Render) RenderFindPage(w io.Writer) error {
-	return r.tmpl.ExecuteTemplate(w, "find.html", nil)
 }
