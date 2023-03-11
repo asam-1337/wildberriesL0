@@ -1,7 +1,6 @@
 package render
 
 import (
-	"github.com/asam-1337/wildberriesL0/internal/domain/entity"
 	"html/template"
 	"io"
 	"log"
@@ -22,12 +21,10 @@ func NewRenderService() *Render {
 	return r
 }
 
-func (r *Render) RenderRootPage(w io.Writer, orders entity.Order, exist bool) error {
+func (r *Render) RenderRootPage(w io.Writer, order any) error {
 	return r.tmpl.ExecuteTemplate(w, "index.html", struct {
-		Order entity.Order
-		Exist bool
+		Order any
 	}{
-		Order: orders,
-		Exist: exist,
+		Order: order,
 	})
 }

@@ -9,22 +9,25 @@
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css" integrity="sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M" crossorigin="anonymous">
 </head>
 <body>
+  <center>
+    <div class="container center">
+      <h1>Find order</h1>
 
-<div class="container">
-  <h1>Find order</h1>
+      <form method="POST" action="/">
+        <div class="form-group">
+          <label for="OrderUID">OrderUID</label>
+          <input type="text" class="form-control" name="order_uid" id="OrderUID" placeholder="order_uid">
+        </div>
+        <button type="submit" class="btn btn-primary">Submit</button>
+      </form>
 
-  <form method="post" action="/find">
-    <div class="form-group">
-      <label for="OrderUID">OrderUID</label>
-      <input type="text" class="form-control" name="order_uid" id="OrderUID">
+      {{if .Order}}
+        <p>{{.Order}}</p>
+      {{else}}
+        <h5 style="margin-top:50px"><b>No result</b></h5>
+      {{end}}
+
     </div>
-    <button type="submit" class="btn btn-primary">Submit</button>
-
-    {{if .Exist}}
-      <p>{{.Order}}</p>
-    {{end}}
-
-  </form>
-</div>
+  </center>
 </body>
 </html>

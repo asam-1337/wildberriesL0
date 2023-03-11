@@ -3,11 +3,12 @@ package nats
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"github.com/asam-1337/wildberriesL0/config"
 	"github.com/asam-1337/wildberriesL0/internal/domain/entity"
+	"github.com/asam-1337/wildberriesL0/internal/localErrors"
 	"github.com/nats-io/stan.go"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"reflect"
 	"time"
 )
@@ -29,73 +30,81 @@ type (
 		cfg   config.StanConfig
 		repo  Repository
 		cache CacheService
+		sc    stan.Conn
+		sub   stan.Subscription
 	}
 )
 
 func NewBroker(cfg config.StanConfig, cache CacheService, repo Repository) *Broker {
 	return &Broker{
-		cfg: cfg,
+		cfg:   cfg,
+		cache: cache,
+		repo:  repo,
 	}
 }
 
 func (b *Broker) Subscribe() error {
-	sc, err := stan.Connect(b.cfg.ClusterID, b.cfg.ClientID)
+	var err error
+	b.sc, err = stan.Connect(b.cfg.ClusterID, b.cfg.ClientID)
 	if err != nil {
-		return fmt.Errorf("cant connect to nats server: %s", err)
-	}
-	defer func() {
-		err := sc.Close()
-		if err != nil {
-			log.Printf("cant close conn: %s", err.Error())
-		}
-	}()
-
-	dur, err := time.ParseDuration("1s")
-	if err != nil {
-		log.Println("cant parse time")
+		log.WithField("err", err.Error()).Error("cant connect to nats-streaming-server")
 		return err
 	}
 
-	sub, err := sc.Subscribe(
+	dur, err := time.ParseDuration("1s")
+	if err != nil {
+		log.WithField("err", err.Error()).Error("cant parse time")
+		return err
+	}
+
+	b.sub, err = b.sc.Subscribe(
 		b.cfg.ChannelID,
 		b.receiveHandler,
 		stan.DurableName("durable"),
 		stan.SetManualAckMode(),
 		stan.AckWait(dur))
 	if err != nil {
-		return fmt.Errorf("cant subscribe: %s", err.Error())
+		log.WithField("err", err.Error()).Error("cant subscribe")
+		return err
 	}
 
-	defer func() {
-		err = sub.Unsubscribe()
-		if err != nil {
-			log.Println(err.Error())
-		}
-
-		err = sub.Close()
-		if err != nil {
-			log.Println(err.Error())
-		}
-	}()
-
+	log.Infof("succesfully subscribe")
 	return nil
+}
+
+func (b *Broker) Close() {
+	var err error
+	err = b.sub.Unsubscribe()
+	if err != nil {
+		log.WithField("err", err.Error()).Warn("cant unsubscribe")
+	}
+
+	err = b.sub.Close()
+	if err != nil {
+		log.WithField("err", err.Error()).Warn("cant close subscription")
+	}
+
+	err = b.sc.Close()
+	if err != nil {
+		log.WithField("err", err.Error()).Warn("cant close conn")
+	}
 }
 
 func (b *Broker) receiveHandler(m *stan.Msg) {
 	err := m.Ack()
 	if err != nil {
-		log.Println(err.Error())
+		log.WithField("err", err.Error()).Warn("cant acknowledge")
 		return
 	}
 
-	order, err := b.validateMessage(m.Data)
-	if err != nil {
-		log.Println(err.Error())
+	order, ok := b.validateMessage(m.Data)
+	if !ok {
+		log.Info("message is invalid")
 		return
 	}
 
 	if exist := b.cache.Exist(order.OrderUID); exist {
-		log.Println("order already exist")
+		log.Info("order has already existed")
 		return
 	}
 
@@ -103,29 +112,34 @@ func (b *Broker) receiveHandler(m *stan.Msg) {
 	b.cache.Store(order.OrderUID, order)
 	err = b.repo.Insert(ctx, order)
 	if err != nil {
-		log.Println(err.Error())
+		if errors.Is(err, localErrors.ErrAlreadyExists) {
+			log.WithField("info", err.Error()).Info("cant insert in repository")
+			return
+		}
+		log.WithField("err", err.Error()).Error("cant insert in repository")
 	}
 }
 
-func (b *Broker) validateMessage(msg []byte) (entity.Order, error) {
+func (b *Broker) validateMessage(msg []byte) (entity.Order, bool) {
 	order := entity.Order{}
 	err := json.Unmarshal(msg, &order)
 	if err != nil {
-		return entity.Order{}, fmt.Errorf("cant unmarshal json: %s", err.Error())
+		return entity.Order{}, false
 	}
 
 	val := reflect.ValueOf(order).Elem()
 	for i := 0; i < val.NumField(); i++ {
 		if val.Field(i).IsZero() && len(order.OrderUID) != 19 {
-			return entity.Order{}, err
+			return entity.Order{}, false
 		}
 	}
-	return order, nil
+	return order, true
 }
 
 func (b *Broker) restoreCash() error {
 	orders, err := b.repo.SelectAll(context.Background())
 	if err != nil {
+		log.WithField("err", err).Error("cant select from db")
 		return err
 	}
 

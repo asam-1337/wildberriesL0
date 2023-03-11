@@ -41,12 +41,17 @@ func NewTransactionBalancer(ctx context.Context, cfg config.PostgresConfig) (Tra
 
 	c, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
-		return TransactionBalancer{}, fmt.Errorf("cant parse pool config")
+		return TransactionBalancer{}, fmt.Errorf("cant parse pool config: %s", err.Error())
 	}
 
 	pool, err := pgxpool.NewWithConfig(ctx, c)
 	if err != nil {
-		return TransactionBalancer{}, fmt.Errorf("can")
+		return TransactionBalancer{}, fmt.Errorf("cant configure pgxpool: %s", err.Error())
+	}
+
+	err = pool.Ping(ctx)
+	if err != nil {
+		return TransactionBalancer{}, err
 	}
 	return TransactionBalancer{dbPool: pool}, nil
 }

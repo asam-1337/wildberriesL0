@@ -49,8 +49,8 @@ func InitConfig() (App, error) {
 		Host:     viper.GetString("db.host"),
 		Port:     viper.GetString("db.port"),
 		DbName:   viper.GetString("db.name"),
-		Username: os.Getenv("DB_USERNAME"),
-		Password: os.Getenv("DB_PASSWORD"),
+		Username: os.Getenv("POSTGRES_USER"),
+		Password: os.Getenv("POSTGRES_PASSWORD"),
 	}
 
 	stan := StanConfig{

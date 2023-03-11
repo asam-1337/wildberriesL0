@@ -91,8 +91,11 @@ func (r *OrdersRepository) SelectById(ctx context.Context, id string) (entity.Or
 	row := runner.QueryRow(ctx, sql, values...)
 	dto := orderDto{}
 	err = row.Scan(&dto.OrderData)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return entity.Order{}, localErrors.ErrNotFound
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entity.Order{}, localErrors.ErrNotFound
+		}
+		return entity.Order{}, err
 	}
 
 	order, err := orderFromDto(dto)
@@ -116,6 +119,7 @@ func (r *OrdersRepository) SelectAll(ctx context.Context) ([]entity.Order, error
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	orders := make([]entity.Order, 0)
 	for rows.Next() {
@@ -132,6 +136,5 @@ func (r *OrdersRepository) SelectAll(ctx context.Context) ([]entity.Order, error
 
 		orders = append(orders, order)
 	}
-
 	return orders, nil
 }

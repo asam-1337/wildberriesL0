@@ -1,10 +1,19 @@
 package logger
 
 import (
-	"log"
-	"os"
+	"fmt"
+	"github.com/sirupsen/logrus"
+	"path"
+	"runtime"
 )
 
-func Error() {
-	l := log.New(os.Stdout, "[ERROR]")
+func InitLogger() {
+	logrus.SetReportCaller(true)
+	logrus.SetFormatter(&logrus.TextFormatter{
+		CallerPrettyfier: func(frame *runtime.Frame) (function string, file string) {
+			filename := path.Base(frame.File)
+			return fmt.Sprintf("%s", frame.Function), fmt.Sprintf("%s:%d", filename, frame.Line)
+		},
+		FullTimestamp: true,
+	})
 }
