@@ -1,14 +1,14 @@
-PHONY: lint
-lint:
-	golangci-lint run --config=.golangci.pipeline.yaml ./...
-
 PHONY: test
 test:
 	go test ./...
 
-PHONY: run
+.PHONY: run
 run:
 	go run ./cmd/app/main.go
+
+.PHONY: publish
+publish:
+	go run cmd/publish/publish.go
 
 PHONY: goose-up
 goose-up:

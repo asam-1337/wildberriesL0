@@ -3,41 +3,18 @@ version: '3.9'
 services:
   postgres:
     image: postgres:latest
+    container_name: postgres
+    ports:
+      - "5432:5432"
     env_file:
       - ./db.env
     volumes:
       - ./migrations/:/docker-entrypoint-initdb.d
-    ports:
-      - "5432:5432"
 
-#  nats-streaming:
-#    image: nats-streaming:latest
-#    container_name: nats_streaming
-#    ports:
-#      - "4222:4222"
-#      - "8222:8222"
-#
-#  nats-stream:
-#    container_name: nats-streaming
-#    image: nats-streaming:latest
-#    ports:
-#      - "8222:8222"
-#      - "4222:4222"
-#      - "6222:6222"
-#    networks: [ "nats" ]
-#    restart: always
-#    command: [
-#      '-p',
-#      '4222',
-#      '-m',
-#      '8222',
-#      '-hbi',
-#      '5s',
-#      '-hbt',
-#      '5s',
-#      '-hbf',
-#      '2',
-#      '-SD',
-#      '-cid',
-#      'microservice',
-#    ]
+
+  nats-streaming:
+    image: nats-streaming:latest
+    container_name: nats_streaming
+    ports:
+      - "4222:4222"
+      - "8222:8222"
