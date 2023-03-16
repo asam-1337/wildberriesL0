@@ -6,6 +6,12 @@ import (
 	"time"
 )
 
+type Service interface {
+	Store(key string, value entity.Order)
+	Load(key string) (value entity.Order, loaded bool)
+	Exist(key string) (loaded bool)
+}
+
 type Item struct {
 	Value      entity.Order
 	Expiration int64

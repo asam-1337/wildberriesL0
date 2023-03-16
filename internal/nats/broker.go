@@ -5,52 +5,42 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/asam-1337/wildberriesL0/config"
+	"github.com/asam-1337/wildberriesL0/internal/cache"
 	"github.com/asam-1337/wildberriesL0/internal/domain/entity"
 	"github.com/asam-1337/wildberriesL0/internal/localErrors"
+	"github.com/asam-1337/wildberriesL0/internal/repository"
 	"github.com/nats-io/stan.go"
 	log "github.com/sirupsen/logrus"
 	"reflect"
+	"strings"
 	"time"
 )
 
-type (
-	CacheService interface {
-		Store(key string, value entity.Order)
-		Load(key string) (value entity.Order, loaded bool)
-		Exist(key string) (loaded bool)
+type Broker struct {
+	cfg   config.StanConfig
+	repo  repository.Repository
+	cache cache.Service
+	sc    stan.Conn
+	sub   stan.Subscription
+}
+
+func NewBroker(cfg config.StanConfig, cache cache.Service, repo repository.Repository) (*Broker, error) {
+	var err error
+	sc, err := stan.Connect(cfg.ClusterID, cfg.ClientID)
+	if err != nil {
+		log.WithField("err", err.Error()).Error("cant connect to nats-streaming-server")
+		return nil, err
 	}
 
-	Repository interface {
-		Insert(ctx context.Context, order entity.Order) error
-		SelectById(ctx context.Context, id string) (entity.Order, error)
-		SelectAll(ctx context.Context) ([]entity.Order, error)
-	}
-
-	Broker struct {
-		cfg   config.StanConfig
-		repo  Repository
-		cache CacheService
-		sc    stan.Conn
-		sub   stan.Subscription
-	}
-)
-
-func NewBroker(cfg config.StanConfig, cache CacheService, repo Repository) *Broker {
 	return &Broker{
 		cfg:   cfg,
 		cache: cache,
 		repo:  repo,
-	}
+		sc:    sc,
+	}, nil
 }
 
 func (b *Broker) Subscribe() error {
-	var err error
-	b.sc, err = stan.Connect(b.cfg.ClusterID, b.cfg.ClientID)
-	if err != nil {
-		log.WithField("err", err.Error()).Error("cant connect to nats-streaming-server")
-		return err
-	}
-
 	dur, err := time.ParseDuration("1s")
 	if err != nil {
 		log.WithField("err", err.Error()).Error("cant parse time")
@@ -72,21 +62,26 @@ func (b *Broker) Subscribe() error {
 	return nil
 }
 
+func (b *Broker) Publish(order entity.Order) error {
+	data, err := json.Marshal(order)
+	if err != nil {
+		return err
+	}
+	return b.sc.Publish(b.cfg.ChannelID, data)
+}
+
 func (b *Broker) Close() {
+	err := b.sc.Close()
+	if err != nil {
+		log.WithField("err", err.Error()).Warn("cant close conn")
+	}
+}
+
+func (b *Broker) Unsubscribe() {
 	var err error
 	err = b.sub.Unsubscribe()
 	if err != nil {
 		log.WithField("err", err.Error()).Warn("cant unsubscribe")
-	}
-
-	err = b.sub.Close()
-	if err != nil {
-		log.WithField("err", err.Error()).Warn("cant close subscription")
-	}
-
-	err = b.sc.Close()
-	if err != nil {
-		log.WithField("err", err.Error()).Warn("cant close conn")
 	}
 }
 
@@ -97,7 +92,7 @@ func (b *Broker) receiveHandler(m *stan.Msg) {
 		return
 	}
 
-	order, ok := b.validateMessage(m.Data)
+	order, ok := validate(m.Data)
 	if !ok {
 		log.Info("message is invalid")
 		return
@@ -120,22 +115,6 @@ func (b *Broker) receiveHandler(m *stan.Msg) {
 	}
 }
 
-func (b *Broker) validateMessage(msg []byte) (entity.Order, bool) {
-	order := entity.Order{}
-	err := json.Unmarshal(msg, &order)
-	if err != nil {
-		return entity.Order{}, false
-	}
-
-	val := reflect.ValueOf(order).Elem()
-	for i := 0; i < val.NumField(); i++ {
-		if val.Field(i).IsZero() && len(order.OrderUID) != 19 {
-			return entity.Order{}, false
-		}
-	}
-	return order, true
-}
-
 func (b *Broker) restoreCash() error {
 	orders, err := b.repo.SelectAll(context.Background())
 	if err != nil {
@@ -147,4 +126,21 @@ func (b *Broker) restoreCash() error {
 		b.cache.Store(order.OrderUID, order)
 	}
 	return nil
+}
+
+func validate(msg []byte) (entity.Order, bool) {
+	order := entity.Order{}
+	err := json.Unmarshal(msg, &order)
+	if err != nil {
+		log.WithField("err", err).Warn("json error")
+		return entity.Order{}, false
+	}
+
+	val := reflect.ValueOf(&order).Elem()
+	for i := 0; i < val.NumField(); i++ {
+		if len(order.OrderUID) != 19 || val.Field(i).IsZero() && !strings.Contains(val.Type().Field(i).Tag.Get("json"), "notrequired") {
+			return entity.Order{}, false
+		}
+	}
+	return order, true
 }

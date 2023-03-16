@@ -3,7 +3,6 @@ package localErrors
 import "errors"
 
 var (
-	ErrAlreadyExists = errors.New("repo: row already exist")
-	ErrNotFound      = errors.New("repo: not found order")
-	ErrCashNotFound  = errors.New("cache: not found")
+	ErrAlreadyExists = errors.New("repo: order already exist")
+	ErrNotFound      = errors.New("repo: order not found")
 )

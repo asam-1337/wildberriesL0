@@ -8,13 +8,18 @@ import (
 	"github.com/Masterminds/squirrel"
 	"github.com/asam-1337/wildberriesL0/internal/domain/entity"
 	"github.com/asam-1337/wildberriesL0/internal/localErrors"
-	"github.com/asam-1337/wildberriesL0/internal/pgxbalancer"
 	"github.com/jackc/pgx/v5"
 )
 
 const (
 	ordersTable = "orders"
 )
+
+type Repository interface {
+	Insert(ctx context.Context, order entity.Order) error
+	SelectById(ctx context.Context, id string) (entity.Order, error)
+	SelectAll(ctx context.Context) ([]entity.Order, error)
+}
 
 type orderDto struct {
 	Id        string `db:"id"`
@@ -24,7 +29,7 @@ type orderDto struct {
 func dtoFromOrder(order entity.Order) (orderDto, error) {
 	data, err := json.Marshal(&order)
 	if err != nil {
-		return orderDto{}, err
+		return orderDto{}, fmt.Errorf("cant marshal order to json: %s", err.Error())
 	}
 	dto := orderDto{
 		Id:        order.OrderUID,
@@ -38,24 +43,20 @@ func orderFromDto(dto orderDto) (entity.Order, error) {
 	order := entity.Order{}
 	err := json.Unmarshal(dto.OrderData, &order)
 	if err != nil {
-		return entity.Order{}, fmt.Errorf("cant unmarshal order json")
+		return entity.Order{}, fmt.Errorf("cant unmarshal json to order: %s", err.Error())
 	}
 
 	return order, nil
 }
 
 type OrdersRepository struct {
-	pgxbalancer.TransactionBalancer
+	pool Runner
 }
 
-func NewOrdersRepository(balancer pgxbalancer.TransactionBalancer) *OrdersRepository {
+func NewOrdersRepository(pool Runner) *OrdersRepository {
 	return &OrdersRepository{
-		balancer,
+		pool: pool,
 	}
-}
-
-func (r *OrdersRepository) GetRunner(ctx context.Context) pgxbalancer.Runner {
-	return r.TransactionBalancer.GetRunner(ctx)
 }
 
 func (r *OrdersRepository) Insert(ctx context.Context, order entity.Order) error {
@@ -64,14 +65,17 @@ func (r *OrdersRepository) Insert(ctx context.Context, order entity.Order) error
 		return err
 	}
 
-	runner := r.GetRunner(ctx)
 	sql, values, err := squirrel.Insert(ordersTable).
 		Columns("id", "order_data").
 		Values(dto.Id, dto.OrderData).
+		PlaceholderFormat(squirrel.Dollar).
 		ToSql()
-	ct, err := runner.Exec(ctx, sql, values)
-	if ct.RowsAffected() == 0 {
-		return localErrors.ErrAlreadyExists
+	ct, err := r.pool.Exec(ctx, sql, values...)
+	if err != nil {
+		if ct.RowsAffected() == 0 {
+			return err
+		}
+		return err
 	}
 
 	return err
@@ -87,8 +91,7 @@ func (r *OrdersRepository) SelectById(ctx context.Context, id string) (entity.Or
 		return entity.Order{}, err
 	}
 
-	runner := r.GetRunner(ctx)
-	row := runner.QueryRow(ctx, sql, values...)
+	row := r.pool.QueryRow(ctx, sql, values...)
 	dto := orderDto{}
 	err = row.Scan(&dto.OrderData)
 	if err != nil {
@@ -109,13 +112,13 @@ func (r *OrdersRepository) SelectById(ctx context.Context, id string) (entity.Or
 func (r *OrdersRepository) SelectAll(ctx context.Context) ([]entity.Order, error) {
 	sql, values, err := squirrel.Select("order_data").
 		From(ordersTable).
+		PlaceholderFormat(squirrel.Dollar).
 		ToSql()
 	if err != nil {
 		return nil, err
 	}
 
-	runner := r.GetRunner(ctx)
-	rows, err := runner.Query(ctx, sql, values)
+	rows, err := r.pool.Query(ctx, sql, values...)
 	if err != nil {
 		return nil, err
 	}

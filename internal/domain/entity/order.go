@@ -10,7 +10,7 @@ type Order struct {
 	Payment           Payment   `json:"payment"`
 	Items             []Item    `json:"items"`
 	Locale            string    `json:"locale"`
-	InternalSignature string    `json:"internal_signature"`
+	InternalSignature string    `json:"internal_signature,notrequired"`
 	CustomerID        string    `json:"customer_id"`
 	DeliveryService   string    `json:"delivery_service"`
 	Shardkey          string    `json:"shardkey"`
