@@ -10,6 +10,6 @@ db:
 stan:
   cluster_id: "test-cluster"
   client_id: "subscriber"
-  channel_id: "test-channel"
+  channel_id: "foo"
 
 

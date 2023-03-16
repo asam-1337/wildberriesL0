@@ -3,22 +3,21 @@ package render
 import (
 	"html/template"
 	"io"
-	"log"
 )
 
 type Render struct {
 	tmpl *template.Template
 }
 
-func NewRenderService() *Render {
+func NewRenderService() (*Render, error) {
 	r := &Render{}
 	tmpl, err := template.ParseFiles("./templates/index.html")
 	if err != nil {
-		log.Fatalf(err.Error())
+		return nil, err
 	}
 
 	r.tmpl = tmpl
-	return r
+	return r, nil
 }
 
 func (r *Render) RenderRootPage(w io.Writer, order any) error {

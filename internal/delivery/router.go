@@ -31,6 +31,5 @@ func NewHandler(rnd *render.Render, svc Service) *Handler {
 func (h *Handler) InitRoutes() *mux.Router {
 	r := mux.NewRouter()
 	r.HandleFunc("/", h.RootPage)
-	r.HandleFunc("/find", h.FindOrder).Methods("POST")
 	return r
 }

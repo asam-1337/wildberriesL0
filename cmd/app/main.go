@@ -21,7 +21,7 @@ func main() {
 		log.WithField("err", err.Error()).Fatal("error occurred on init config")
 	}
 
-	c := cache.NewCache(time.Hour, time.Minute)
+	c := cache.NewCache(time.Hour, 30*time.Minute)
 	pool, err := repository.NewPgxPool(context.Background(), cfg.Pg)
 	if err != nil {
 		log.WithField("err", err.Error()).Fatal("error occurred on db init")
@@ -38,12 +38,16 @@ func main() {
 		log.WithField("err", err.Error()).Fatal("error occurred on broker init")
 	}
 
-	rnd := render.NewRenderService()
+	rnd, err := render.NewRenderService()
+	if err != nil {
+		log.WithField("err", err.Error()).Fatal("error occurred on render init")
+	}
+
 	svc := service.NewService(c, repo)
 	handler := delivery.NewHandler(rnd, svc)
 	router := handler.InitRoutes()
 
-	s := httpServer.NewHttpServer("8080", router)
+	s := httpServer.NewHttpServer(cfg.Port, router)
 	log.WithField("port", cfg.Port).Info("starting server")
 
 	err = s.ListenAndServe()

@@ -1,7 +1,6 @@
 package delivery
 
 import (
-	"context"
 	"errors"
 	"github.com/asam-1337/wildberriesL0/internal/localErrors"
 	log "github.com/sirupsen/logrus"
@@ -38,23 +37,4 @@ func (h *Handler) RootPage(w http.ResponseWriter, r *http.Request) {
 		log.WithField("err", err.Error()).Error("cant render page")
 		w.WriteHeader(http.StatusInternalServerError)
 	}
-}
-
-func (h *Handler) FindOrder(w http.ResponseWriter, r *http.Request) {
-	uid := r.FormValue(formOrderKey)
-	if uid == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		log.Info("bad request from user")
-		return
-	}
-
-	order, err := h.svc.GetOrder(r.Context(), uid)
-	if err != nil {
-		log.WithField("err", err.Error()).Info(err.Error())
-		return
-	}
-
-	ctx := context.WithValue(r.Context(), ctxOrderKey, order)
-	r = r.WithContext(ctx)
-	http.Redirect(w, r, "/", http.StatusMovedPermanently)
 }
